@@ -1,0 +1,13 @@
+uv add supabase
+
+
+
+SUPABASE_URL = ""
+
+project url
+
+PROJECT SETTING 
+API KEYS
+
+VIEW LEGACY API KEY
+ANON PUBLIC
