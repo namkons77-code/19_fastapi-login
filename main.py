@@ -4,6 +4,9 @@ from sqlalchemy.orm import declarative_base, Session
 from pydantic import BaseModel
 from supabase import create_client, ClientOptions
 
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import RedirectResponse
+
 # 1. psycopg3 드라이버 명시
 DATABASE_URL = "postgresql+psycopg://postgres.qbbuzeigxvrfzuodcerm:ZoVF2tqfEoLhlURI@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
 engine = create_engine(DATABASE_URL)
@@ -84,3 +87,60 @@ def signup(form: EmailForm, db: Session = Depends(get_db)):
         "email": profile.email,
         "username": profile.username
     }
+
+@app.post("/login")
+def login(form:EmailForm):
+    try:
+        res = supabase.auth.sign_in_with_password({
+        "email":form.email,
+        "password":form.password
+    })
+
+    except:
+        raise HTTPException(status_code=401, detail="이메닝ㄹ또는 비밀번호가 잘못되었습니다.")
+    return {
+        "access_token": res.session.access_token
+    }
+
+
+@app.get("/profiles")
+def read_profiles(db: Session = Depends(get_db)):
+    profiles = db.query(Profile).all()
+    return [
+       {
+           "id": profile.id, 
+           "email": profile.email, 
+           "username": profile.username,
+           "provider": profile.provider
+        } for profile in profiles
+    ]
+
+bearer = HTTPBearer()
+
+@app.get("/me")
+def me(cred: HTTPAuthorizationCredentials = Depends(bearer), db: Session = Depends(get_db)):
+    try:
+        user = supabase.auth.get_user(cred.credentials).user
+    except:
+        raise HTTPException(status_code=401, detail="토큰이 잘못되었습니다.")
+
+    profile = db.get(Profile, user.id)
+
+    if profile is None: 
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 잘못되었습니다.")
+
+    return {
+        "id": profile.id, 
+        "username": profile.username, 
+        "email": profile.email,
+        "provider": profile.provider
+    }
+
+# 카카오 로그인
+@app.get("/login/kakao")
+def login_kakao():
+    res = supabase.auth.sign_in_with_oauth({
+        "provider": "kakao",
+        "options": {"redirect_to": "http://127.0.0.1:8000/auth/callback"}
+    })
+    return RedirectResponse(res.url)

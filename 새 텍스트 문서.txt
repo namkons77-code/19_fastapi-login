@@ -11,3 +11,8 @@ API KEYS
 
 VIEW LEGACY API KEY
 ANON PUBLIC
+
+
+sign in/providers
+confirm email 해제
+
