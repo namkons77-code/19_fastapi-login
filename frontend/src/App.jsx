@@ -397,11 +397,11 @@ function App() {
   }
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://127.0.0.1:8000/login/google'
+    window.location.href = `${API_BASE}/login/google`
   }
 
   const handleKakaoLogin = () => {
-    window.location.href = 'http://127.0.0.1:8000/login/kakao'
+    window.location.href = `${API_BASE}/login/kakao`
   }
 
   // 날짜/시간 포맷팅 (오늘이면 시간, 이전이면 날짜)
