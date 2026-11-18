@@ -1,0 +1,42 @@
+uv add supabase
+
+
+
+SUPABASE_URL = ""
+
+project url
+
+PROJECT SETTING 
+API KEYS
+
+VIEW LEGACY API KEY
+ANON PUBLIC
+
+
+sign in/providers
+confirm email 해제
+
+
+fastapi-login 폴더를 backend 폴더에 구성하고
+frontend 폴더를 만들어서 그 안에는 react(vite)로 세팅해줘
+
+회원가입 폼을 만드는데 
+fastapi에서 생성된 함수를 기반으로 회원가입 UI를 생성해줘
+
+카카오 로그인은 email정보를 가져올 수 없으니 db에서 email 선택적으로 입력이 되도록 수정
+
+----------------------------------------------------------------------------
+
+구글클라우드 
+검색창 클라이언트
+클라이언트 만들기
+웹클라이언트
+리다이렉션 ULR 등 .... supabase... 설정
+
+----------------------------------------------------------------------------
+
+npm install -g supabase
+
+supabase login
+
+

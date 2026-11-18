@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, String
 from sqlalchemy.orm import declarative_base, Session
 from pydantic import BaseModel
@@ -7,7 +8,6 @@ from supabase import create_client, ClientOptions
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import RedirectResponse
 
-# 1. psycopg3 드라이버 명시
 DATABASE_URL = "postgresql+psycopg://postgres.qbbuzeigxvrfzuodcerm:ZoVF2tqfEoLhlURI@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
@@ -15,11 +15,9 @@ Base = declarative_base()
 SUPABASE_URL = "https://qbbuzeigxvrfzuodcerm.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFiYnV6ZWlneHZyZnp1b2RjZXJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3OTU1NTYsImV4cCI6MjExMDM3MTU1Nn0.-GTMkAVjwhYbRXb1lBPiurA_FzVlAS78i0EMefQ6TJM"
 
-# 2. supabase 변수에 클라이언트 할당
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY, options=ClientOptions(flow_type="pkce"))
 
 
-# 3. Supabase Auth의 user.id는 UUID 문자열이므로 id를 String으로 변경
 class Profile(Base):
     __tablename__ = "profiles"
     id = Column(String, primary_key=True, index=True)
@@ -34,11 +32,14 @@ class EmailForm(BaseModel):
     password: str
 
 
-# 테이블이 없으면 생성
+class LoginForm(BaseModel):
+    email: str
+    password: str
+
+
 Base.metadata.create_all(bind=engine)
 
 
-# 요청마다 세션을 열고, 끝나면 닫는 함수
 def get_db():
     db = Session(bind=engine)
     try:
@@ -49,19 +50,30 @@ def get_db():
 
 app = FastAPI()
 
+# React 등 프론트엔드 연동을 위한 CORS 미들웨어 등록
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/")
 def read_home():
-    return {
-        "hello": "world"
-    }
+    return {"hello": "world"}
 
 
 def save_profile(db: Session, user, username, provider):
     profile = db.get(Profile, str(user.id))
     if profile is None:
-        # 4. 생성한 Profile 객체를 profile 변수에 대입
-        profile = Profile(id=str(user.id), email=user.email, username=username, provider=provider)
+        profile = Profile(
+            id=str(user.id),
+            email=user.email,
+            username=username,
+            provider=provider
+        )
         db.add(profile)
         db.commit()
         db.refresh(profile)
@@ -88,16 +100,20 @@ def signup(form: EmailForm, db: Session = Depends(get_db)):
         "username": profile.username
     }
 
+
 @app.post("/login")
-def login(form:EmailForm):
+def login(form: LoginForm):
     try:
         res = supabase.auth.sign_in_with_password({
-        "email":form.email,
-        "password":form.password
-    })
+            "email": form.email,
+            "password": form.password
+        })
+    except Exception:
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 잘못되었습니다.")
 
-    except:
-        raise HTTPException(status_code=401, detail="이메닝ㄹ또는 비밀번호가 잘못되었습니다.")
+    if res.session is None:
+        raise HTTPException(status_code=401, detail="로그인에 실패했거나 이메일 인증이 필요합니다.")
+
     return {
         "access_token": res.session.access_token
     }
@@ -107,40 +123,86 @@ def login(form:EmailForm):
 def read_profiles(db: Session = Depends(get_db)):
     profiles = db.query(Profile).all()
     return [
-       {
-           "id": profile.id, 
-           "email": profile.email, 
-           "username": profile.username,
-           "provider": profile.provider
+        {
+            "id": profile.id,
+            "email": profile.email,
+            "username": profile.username,
+            "provider": profile.provider
         } for profile in profiles
     ]
 
+
 bearer = HTTPBearer()
+
 
 @app.get("/me")
 def me(cred: HTTPAuthorizationCredentials = Depends(bearer), db: Session = Depends(get_db)):
     try:
         user = supabase.auth.get_user(cred.credentials).user
-    except:
+    except Exception:
         raise HTTPException(status_code=401, detail="토큰이 잘못되었습니다.")
 
-    profile = db.get(Profile, user.id)
-
-    if profile is None: 
-        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 잘못되었습니다.")
+    profile = db.get(Profile, str(user.id))
+    if profile is None:
+        raise HTTPException(status_code=404, detail="프로필을 찾을 수 없습니다.")
 
     return {
-        "id": profile.id, 
-        "username": profile.username, 
+        "id": profile.id,
+        "username": profile.username,
         "email": profile.email,
         "provider": profile.provider
     }
 
-# 카카오 로그인
+
+# 구글 로그인
+@app.get("/login/google")
+def login_google():
+    res = supabase.auth.sign_in_with_oauth({
+        "provider": "google",
+        "options": {
+            "redirect_to": "http://127.0.0.1:8000/auth/callback",
+            "query_params": {
+                "access_type": "offline",
+                "prompt": "consent",
+            }
+        }
+    })
+    return RedirectResponse(res.url)
+
+
+# 카카오 로그인 시작
 @app.get("/login/kakao")
 def login_kakao():
     res = supabase.auth.sign_in_with_oauth({
         "provider": "kakao",
-        "options": {"redirect_to": "http://127.0.0.1:8000/auth/callback"}
+        "options": {
+            "redirect_to": "http://127.0.0.1:8000/auth/callback",
+            "scopes": "profile_nickname"
+            }
+    
+
     })
     return RedirectResponse(res.url)
+
+
+# 카카오 로그인 콜백 처리
+@app.get("/auth/callback")
+def auth_callback(code: str, db: Session = Depends(get_db)):
+    try:
+        res = supabase.auth.exchange_code_for_session({"auth_code": code})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"카카오 인증 코드 교환 실패: {str(e)}")
+
+    user = res.user
+    raw_name = user.user_metadata.get("name") or user.user_metadata.get("preferred_username") or "kakao_user"
+    # username unique 제약조건 충돌 방지를 위해 UUID 앞 6자리 조합
+    unique_username = f"{raw_name}_{str(user.id)[:6]}"
+
+    profile = save_profile(db, user, unique_username, "kakao")
+    return {
+        "access_token": res.session.access_token,
+        "id": profile.id,
+        "username": profile.username,
+        "email": profile.email,
+        "provider": profile.provider
+    }
