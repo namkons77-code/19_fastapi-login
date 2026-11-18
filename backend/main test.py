@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, String
@@ -8,12 +11,17 @@ from supabase import create_client, ClientOptions
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import RedirectResponse
 
-DATABASE_URL = "postgresql+psycopg://postgres.qbbuzeigxvrfzuodcerm:ZoVF2tqfEoLhlURI@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
+BASE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = BASE_DIR.parent
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(BASE_DIR / ".env", override=True)
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
 
-SUPABASE_URL = "https://qbbuzeigxvrfzuodcerm.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFiYnV6ZWlneHZyZnp1b2RjZXJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3OTU1NTYsImV4cCI6MjExMDM3MTU1Nn0.-GTMkAVjwhYbRXb1lBPiurA_FzVlAS78i0EMefQ6TJM"
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY, options=ClientOptions(flow_type="pkce"))
 

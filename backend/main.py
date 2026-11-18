@@ -1,5 +1,7 @@
 import os
+from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, String, Integer, Text, DateTime, ForeignKey, desc, or_
@@ -10,13 +12,25 @@ from supabase import create_client, ClientOptions
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import RedirectResponse
 
-# 1. psycopg3 드라이버 명시
-DATABASE_URL = "postgresql+psycopg://postgres.qbbuzeigxvrfzuodcerm:ZoVF2tqfEoLhlURI@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
+# 0. .env 환경변수 로드 (루트 및 backend 디렉터리 순서대로 탐색)
+BASE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = BASE_DIR.parent
+
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(BASE_DIR / ".env", override=True)
+
+# 1. psycopg3 드라이버 명시 및 환경변수 로드
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL 환경변수가 설정되지 않았습니다. .env 파일을 확인해주세요.")
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError("SUPABASE_URL 및 SUPABASE_KEY 환경변수가 설정되지 않았습니다. .env 파일을 확인해주세요.")
+
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
-
-SUPABASE_URL = "https://qbbuzeigxvrfzuodcerm.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFiYnV6ZWlneHZyZnp1b2RjZXJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3OTU1NTYsImV4cCI6MjExMDM3MTU1Nn0.-GTMkAVjwhYbRXb1lBPiurA_FzVlAS78i0EMefQ6TJM"
 
 # 2. supabase 변수에 클라이언트 할당
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY, options=ClientOptions(flow_type="pkce"))
